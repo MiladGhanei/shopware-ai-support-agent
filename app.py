@@ -1,17 +1,6 @@
-import os
-from dotenv import load_dotenv
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 import json
 import requests
-
-load_dotenv()
-
-api_key = os.getenv("OPENROUTER_API_KEY")
-shopware_url = os.getenv("SHOPWARE_URL")
-shopware_access_id = os.getenv("SHOPWARE_ACCESS_ID")
-shopware_secret = os.getenv("SHOPWARE_SECRET_ACCESS_KEY")
-
-client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 
 SYSTEM_PROMPT = """
 Du bist ein Shopware-Kundenservice-Assistent.
@@ -53,7 +42,7 @@ tools = [
                     },
                     "zipcode": {
                         "type": "string",
-                        "description": "Die Postleitzahl der Rechnungsadresse",
+                        "description": "Die Postleitzahl der Lieferadresse",
                     },
                 },
                 "required": ["order_number", "zipcode"],
@@ -63,7 +52,7 @@ tools = [
 ]
 
 
-def get_shopware_token():
+def get_shopware_token(shopware_url, shopware_access_id, shopware_secret):
     response = requests.post(
         f"{shopware_url}/api/oauth/token",
         json={
@@ -78,8 +67,8 @@ def get_shopware_token():
     return response.json()["access_token"]
 
 
-def get_shopware_order(order_number):
-    token = get_shopware_token()
+def get_shopware_order(order_number, shopware_url, shopware_access_id, shopware_secret):
+    token = get_shopware_token(shopware_url, shopware_access_id, shopware_secret)
 
     response = requests.post(
         f"{shopware_url}/api/search/order",
@@ -104,7 +93,6 @@ def get_shopware_order(order_number):
                         "shippingOrderAddress": {},
                     }
                 },
-                "billingAddress": {},
             },
             "limit": 1,
         },
@@ -179,9 +167,13 @@ def get_shopware_order(order_number):
     }
 
 
-def get_order_status(order_number, zipcode):
+def get_order_status(
+    order_number, zipcode, shopware_url, shopware_access_id, shopware_secret
+):
     try:
-        order = get_shopware_order(order_number)
+        order = get_shopware_order(
+            order_number, shopware_url, shopware_access_id, shopware_secret
+        )
     except requests.RequestException:
         return {"error": "shopware_unavailable"}
 
@@ -195,12 +187,24 @@ def get_order_status(order_number, zipcode):
     return order
 
 
-def ask_agent(user_message, messages):
+def ask_agent(
+    user_message,
+    messages,
+    openrouter_api_key,
+    shopware_url,
+    shopware_access_id,
+    shopware_secret,
+):
+    client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=openrouter_api_key)
+
     messages.append({"role": "user", "content": user_message})
 
-    response = client.chat.completions.create(
-        model="openrouter/free", messages=messages, tools=tools, tool_choice="auto"
-    )
+    try:
+        response = client.chat.completions.create(
+            model="openrouter/free", messages=messages, tools=tools, tool_choice="auto"
+        )
+    except RateLimitError:
+        return {"error": "llm_rate_limit"}
 
     message = response.choices[0].message
     if message.tool_calls:
@@ -208,7 +212,13 @@ def ask_agent(user_message, messages):
         arguments = json.loads(tool_call.function.arguments)
 
         if tool_call.function.name == "get_order_status":
-            result = get_order_status(arguments["order_number"], arguments["zipcode"])
+            result = get_order_status(
+                arguments["order_number"],
+                arguments["zipcode"],
+                shopware_url,
+                shopware_access_id,
+                shopware_secret,
+            )
 
             messages.append(message)
 
@@ -220,9 +230,12 @@ def ask_agent(user_message, messages):
                 }
             )
 
-            final_response = client.chat.completions.create(
-                model="openrouter/free", messages=messages
-            )
+            try:
+                final_response = client.chat.completions.create(
+                    model="openrouter/free", messages=messages
+                )
+            except RateLimitError:
+                return {"error": "llm_rate_limit"}
 
             final_message = final_response.choices[0].message
             messages.append(final_message)

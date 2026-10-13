@@ -1,10 +1,77 @@
 import streamlit as st
 from app import SYSTEM_PROMPT, ask_agent
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+st.set_page_config(page_title="AI Kundenservice", page_icon="💬", layout="centered")
 
 st.title("AI Kundenservice")
 st.caption("KI-gestützter Shopware Kundenservice")
 
-st.set_page_config(page_title="AI Kundenservice", page_icon="💬", layout="centered")
+with st.sidebar:
+    st.header("Settings")
+
+    st.caption(
+        "Configure the LLM and Shopware connection. "
+        "Values from your local .env file are loaded automatically."
+    )
+
+    with st.form("settings_form"):
+        openrouter_api_key = st.text_input(
+            "OpenRouter API Key",
+            value=os.getenv("OPENROUTER_API_KEY", ""),
+            type="password",
+        )
+
+        shopware_url = st.text_input(
+            "Shopware URL",
+            value=os.getenv("SHOPWARE_URL", ""),
+            placeholder="https://shop.example.com",
+        )
+
+        shopware_access_id = st.text_input(
+            "Shopware Access ID",
+            value=os.getenv("SHOPWARE_ACCESS_ID", ""),
+            type="password",
+        )
+
+        shopware_secret = st.text_input(
+            "Shopware Secret Access Key",
+            value=os.getenv("SHOPWARE_SECRET_ACCESS_KEY", ""),
+            type="password",
+        )
+
+        apply_settings = st.form_submit_button(
+            "Apply Settings", use_container_width=True
+        )
+
+    if apply_settings:
+        st.session_state["settings"] = {
+            "openrouter_api_key": openrouter_api_key,
+            "shopware_url": shopware_url,
+            "shopware_access_id": shopware_access_id,
+            "shopware_secret": shopware_secret,
+        }
+
+    st.divider()
+
+    if all([openrouter_api_key, shopware_url, shopware_access_id, shopware_secret]):
+        st.success("Configuration ready")
+    else:
+        st.warning("Please complete the configuration above.")
+
+settings = st.session_state.get(
+    "settings",
+    {
+        "openrouter_api_key": openrouter_api_key,
+        "shopware_url": shopware_url,
+        "shopware_access_id": shopware_access_id,
+        "shopware_secret": shopware_secret,
+    },
+)
+
 st.markdown(
     """
 <style>
@@ -52,7 +119,37 @@ if user_message:
         with st.chat_message("user"):
             st.write(user_message)
 
-        message = ask_agent(user_message, st.session_state.messages)
+        if not settings["openrouter_api_key"]:
+            st.error("Please enter your OpenRouter API key in Settings.")
+            st.stop()
+
+        if not settings["shopware_url"]:
+            st.error("Please enter your Shopware URL in Settings.")
+            st.stop()
+
+        if not settings["shopware_access_id"]:
+            st.error("Please enter your Shopware Access ID in Settings.")
+            st.stop()
+
+        if not settings["shopware_secret"]:
+            st.error("Please enter your Shopware Secret Access Key in Settings.")
+            st.stop()
+
+        message = ask_agent(
+            user_message,
+            st.session_state.messages,
+            settings["openrouter_api_key"],
+            settings["shopware_url"],
+            settings["shopware_access_id"],
+            settings["shopware_secret"],
+        )
+
+        if isinstance(message, dict) and message.get("error") == "llm_rate_limit":
+            st.error(
+                "The AI service has reached its current request limit. "
+                "Please try again later."
+            )
+            st.stop()
 
         st.session_state.chat_history.append(
             {"role": "assistant", "content": message.content}

@@ -33,6 +33,9 @@ The assistant understands natural-language customer requests and uses tool calli
 - Shipping date information
 - Conversation context across multiple messages
 - Graceful handling of Shopware API failures
+- Configurable OpenRouter and Shopware credentials through the UI
+- Automatic loading of local `.env` configuration
+- Graceful handling of LLM rate limits
 
 ## Architecture
 
