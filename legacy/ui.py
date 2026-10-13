@@ -1,5 +1,5 @@
 import streamlit as st
-from app import SYSTEM_PROMPT, ask_agent
+from app import SYSTEM_PROMPT, ask_agent, test_shopware_connection
 import os
 from dotenv import load_dotenv
 
@@ -44,8 +44,28 @@ with st.sidebar:
         )
 
         apply_settings = st.form_submit_button(
-            "Apply Settings", use_container_width=True
+            "Apply Settings",
+            type="primary",
+            use_container_width=True,
         )
+
+        test_connection = st.form_submit_button(
+            "Test Shopware Connection",
+            use_container_width=True,
+        )
+
+    if test_connection:
+        with st.spinner("Testing Shopware connection..."):
+            result = test_shopware_connection(
+                shopware_url,
+                shopware_access_id,
+                shopware_secret,
+            )
+
+        if result["success"]:
+            st.success("✓ Shopware connected successfully")
+        else:
+            st.error("✕ Could not connect to Shopware")
 
     if apply_settings:
         st.session_state["settings"] = {
@@ -55,12 +75,22 @@ with st.sidebar:
             "shopware_secret": shopware_secret,
         }
 
-    st.divider()
+    settings = st.session_state.get(
+        "settings",
+        {
+            "openrouter_api_key": openrouter_api_key,
+            "shopware_url": shopware_url,
+            "shopware_access_id": shopware_access_id,
+            "shopware_secret": shopware_secret,
+        },
+    )
 
-    if all([openrouter_api_key, shopware_url, shopware_access_id, shopware_secret]):
-        st.success("Configuration ready")
+    if all(settings.values()):
+        st.success("✓ Configuration ready")
     else:
-        st.warning("Please complete the configuration above.")
+        st.warning("Please complete and apply the configuration.")
+
+    st.divider()
 
 settings = st.session_state.get(
     "settings",

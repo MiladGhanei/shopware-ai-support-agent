@@ -67,6 +67,24 @@ def get_shopware_token(shopware_url, shopware_access_id, shopware_secret):
     return response.json()["access_token"]
 
 
+def test_shopware_connection(
+    shopware_url,
+    shopware_access_id,
+    shopware_secret,
+):
+    try:
+        get_shopware_token(
+            shopware_url,
+            shopware_access_id,
+            shopware_secret,
+        )
+
+        return {"success": True}
+
+    except requests.RequestException:
+        return {"success": False}
+
+
 def get_shopware_order(order_number, shopware_url, shopware_access_id, shopware_secret):
     token = get_shopware_token(shopware_url, shopware_access_id, shopware_secret)
 
