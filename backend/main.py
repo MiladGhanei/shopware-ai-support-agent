@@ -73,14 +73,18 @@ def chat(request: ChatRequest):
         ]
         conversations[request.conversation_id] = messages
 
-    result = ask_agent(
-        request.message,
-        messages,
-        OPENROUTER_API_KEY,
-        SHOPWARE_URL,
-        SHOPWARE_ACCESS_ID,
-        SHOPWARE_SECRET_ACCESS_KEY,
-    )
+    try:
+        result = ask_agent(
+            request.message,
+            messages,
+            OPENROUTER_API_KEY,
+            SHOPWARE_URL,
+            SHOPWARE_ACCESS_ID,
+            SHOPWARE_SECRET_ACCESS_KEY,
+        )
+    except Exception as error:
+        print(f"Agent error: {error}")
+        return {"error": "internal_error"}
 
     if isinstance(result, dict):
         return result
