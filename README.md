@@ -2,9 +2,9 @@
 
 An AI-powered customer support assistant for Shopware 6.
 
-The assistant understands natural-language customer requests and uses tool calling to retrieve real-time order data from Shopware.
+Customers can ask questions about their orders in natural language. The AI agent understands the request, uses tool calling to retrieve real-time order data from Shopware, verifies the customer, and responds with the actual order information.
 
-<h2>Demo</h2>
+## Demo
 
 <table>
   <tr>
@@ -33,23 +33,89 @@ The assistant understands natural-language customer requests and uses tool calli
   </tr>
 </table>
 
+> The screenshots above show the original prototype interface. The project is currently being migrated to a dedicated Next.js customer frontend and FastAPI backend.
+
 ## How it works
 
-1. The customer sends a natural-language question.
-2. The LLM determines whether Shopware data is required.
-3. The LLM requests the appropriate backend tool.
-4. The backend verifies the order number and shipping ZIP code.
-5. The backend retrieves the order data through the Shopware Admin API.
-6. Only verified order data is returned to the LLM.
-7. The LLM generates a customer-friendly response based on that data.
+```text
+Customer
+   ↓
+Next.js Customer Interface
+   ↓
+FastAPI Backend
+   ↓
+LLM Agent
+   ↓
+Tool Calling
+   ↓
+Shopware 6 Admin API
+   ↓
+Verified Order Data
+   ↓
+Customer Response
+```
+
+The language model does not access Shopware directly.
+
+Instead, it decides when order information is required and requests the appropriate backend tool. The Python backend executes the Shopware API request and returns only the relevant data to the agent.
+
+## Current Features
+
+- Natural-language customer support chat
+- LLM tool calling
+- Real-time Shopware 6 order lookup
+- Order number and shipping ZIP verification
+- Order status
+- Payment status
+- Delivery status
+- Tracking codes
+- Expected shipping period
+- Conversation context
+- Automatic expiration of inactive conversations
+- Graceful handling of Shopware connection errors
+- Graceful handling of LLM rate limits
+- Server-side credential management
+- Separate customer frontend and AI backend
 
 ## Tech Stack
 
+### Backend
+
 - Python
-- OpenRouter / LLM
-- LLM Tool Calling
+- FastAPI
+- OpenRouter
+- OpenAI-compatible API
 - Shopware 6 Admin API
-- Streamlit
+- Requests
+
+### Frontend
+
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+
+## Project Structure
+
+```text
+shopware-ai-support-agent/
+├── backend/
+│   ├── agent.py
+│   ├── config.py
+│   └── main.py
+├── frontend/
+│   ├── src/
+│   └── package.json
+├── legacy/
+│   ├── app.py
+│   └── ui.py
+├── screenshots/
+├── .env.example
+├── requirements.txt
+└── README.md
+```
+
+The `legacy/` directory contains the original Streamlit prototype.
 
 ## Getting Started
 
@@ -60,20 +126,15 @@ git clone https://github.com/MiladGhanei/shopware-ai-support-agent.git
 cd shopware-ai-support-agent
 ```
 
-### 2. Create a virtual environment
+### 2. Create the Python environment
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-```
-
-### 3. Install dependencies
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure the application
+### 3. Configure the backend
 
 Copy the example environment file:
 
@@ -81,33 +142,77 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
-Add your OpenRouter and Shopware API credentials to `.env`.
+Configure:
 
-Alternatively, the credentials can be configured directly in the application's Settings sidebar.
-
-### 5. Start the application
-
-```bash
-streamlit run ui.py
+```text
+OPENROUTER_API_KEY=your_openrouter_api_key
+SHOPWARE_URL=https://your-shopware-shop.example
+SHOPWARE_ACCESS_ID=your_shopware_access_id
+SHOPWARE_SECRET_ACCESS_KEY=your_shopware_secret_access_key
 ```
 
-## Features
+Credentials are stored on the backend and are never sent to the customer frontend.
 
-- Natural-language order support
-- LLM-driven tool calling
-- Real-time Shopware order lookup
-- Order verification using order number and shipping ZIP code
-- Order, payment and delivery status
-- Tracking information
-- Shipping date information
-- Conversation context across multiple messages
-- Graceful handling of Shopware API failures
-- Configurable OpenRouter and Shopware credentials through the UI
-- Automatic loading of local `.env` configuration
-- Graceful handling of LLM rate limits
+### 4. Start the backend
 
-## Architecture
+From the project root:
 
-Customer → Streamlit UI → LLM → Tool Call → Python Backend → Shopware Admin API
+```bash
+uvicorn backend.main:app --reload
+```
 
-The LLM handles language understanding and conversation, while authentication, verification and Shopware access remain deterministic backend operations.
+The API runs locally at:
+
+```text
+http://localhost:8000
+```
+
+You can check it with:
+
+```text
+http://localhost:8000/health
+```
+
+### 5. Install the frontend
+
+Open another terminal:
+
+```bash
+cd frontend
+npm install
+```
+
+### 6. Start the frontend
+
+```bash
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+## Security
+
+Shopware and LLM credentials remain exclusively on the backend.
+
+Customers never receive:
+
+- Shopware API credentials
+- OpenRouter API keys
+- Internal tool results
+- Shipping ZIP data returned by Shopware
+
+Before order information is returned, the backend verifies the supplied order number against the shipping ZIP code.
+
+The current verification mechanism is intended for the prototype/product validation stage. A production deployment should use stronger customer authentication and appropriate rate limiting.
+
+## Current Product Goal
+
+The first product checkpoint is:
+
+> A Shopware merchant can connect one shop, provide customers with a public support-chat URL, and customers can securely ask about their orders.
+
+The next planned checkpoint is an embeddable Shopware storefront chat widget.
