@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Bot, RotateCcw, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -145,7 +146,9 @@ export default function Home() {
                       : "border border-gray-200 bg-white text-gray-900"
                   }`}
                 >
-                  {chatMessage.content}
+                  <ReactMarkdown>
+                    {chatMessage.content}
+                  </ReactMarkdown>
                 </div>
               </div>
             );
