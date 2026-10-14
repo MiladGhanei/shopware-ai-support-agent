@@ -27,7 +27,7 @@ den voraussichtlichen Lieferzeitraum, nicht den Versandzeitraum.
 Diese Daten sind Schätzungen und keine garantierten Liefertermine.
 14. Wenn der Kunde nach mehreren konkreten Bestellinformationen fragt, stelle genau diese Informationen übersichtlich dar.
 15. Gib technische Statuswerte nicht einfach wörtlich wieder, sondern formuliere sie als natürliche Kundenservice-Sätze in korrektem Deutsch. Vermeide dabei redundante Formulierungen wie "Die Zahlung ist bezahlt".
-16. Wenn der Kunde nach bestellten Produkten oder Artikeln fragt, nenne ausschließlich jeden Produktnamen und die jeweilige Menge als eigenen Aufzählungspunkt. Ergänze keine Preise, Produktnummern, Gesamtsumme, Zahlungs-, Status-, Versand- oder Trackinginformationen, außer der Kunde fragt ausdrücklich danach. Verwende keine Markdown-Tabelle.
+16. Wenn der Kunde nach bestellten Produkten oder Artikeln fragt, nenne ausschließlich jeden Produktnamen und die jeweilige Menge als eigenen Aufzählungspunkt. Wenn gespeicherte Variantenoptionen vorhanden sind, nenne diese ebenfalls, damit sich Varianten unterscheiden lassen. Ergänze keine Preise, Produktnummern, Gesamtsumme, Zahlungs-, Status-, Versand- oder Trackinginformationen, außer der Kunde fragt ausdrücklich danach. Verwende keine Markdown-Tabelle.
 17. Wenn das Tool den Fehler "verification_failed" zurückgibt, sage dem Kunden, dass die Kombination aus Bestellnummer und Postleitzahl nicht verifiziert werden konnte, und bitte ihn, seine Angaben zu prüfen. Sage nicht, ob die Bestellnummer existiert.
 18. Beantworte ausschließlich die konkrete Frage des Kunden. Füge keine weiteren Bestellinformationen hinzu, nur weil sie in den Tool-Daten enthalten sind. Nenne Preise, Status, Zahlung, Versand oder Tracking nur, wenn der Kunde genau danach fragt.
 """
@@ -157,6 +157,10 @@ def get_shopware_order(order_number, shopware_url, shopware_access_id, shopware_
                 "label": item_attributes.get("label"),
                 "quantity": item_attributes.get("quantity"),
             }
+            payload = item_attributes.get("payload") or {}
+            options = payload.get("options")
+            if options:
+                line_item["options"] = options
             for field in ("productNumber", "unitPrice", "totalPrice"):
                 value = item_attributes.get(field)
                 if value is not None:
@@ -220,7 +224,7 @@ def get_order_status(
         return {"error": "shopware_unavailable"}
 
     if order is None:
-        return None
+        return {"error": "verification_failed"}
 
     if order["shippingZipcode"] != zipcode:
         return {"error": "verification_failed"}
