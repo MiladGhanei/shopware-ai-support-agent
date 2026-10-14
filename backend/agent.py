@@ -14,7 +14,7 @@ dass dazu keine Information vorliegt.
 7. Sprich direkt mit dem Kunden und verwende "Ihre Bestellung" bzw. "Ihre Bestellnummer".
 8. Erfinde keine zukünftigen Schritte oder Prozesse wie E-Mails, Tracking-Informationen,
 Liefertermine oder Versandabläufe, wenn diese nicht ausdrücklich in den Tool-Daten stehen.
-9. Wenn Trackingnummern in den Tool-Daten vorhanden sind, nenne sie dem Kunden.
+9. Nenne eine Trackingnummer nur, wenn der Kunde nach dem Versand oder der Sendungsverfolgung fragt und die Nummer in den Tool-Daten vorhanden ist.
 10. Wenn der Kunde nach dem Lieferzeitpunkt fragt und shippingDateEarliest und
 shippingDateLatest vorhanden sind, nenne diesen Zeitraum als voraussichtlichen
 Lieferzeitraum. Stelle ihn nicht als garantierten Liefertermin dar.
@@ -25,8 +25,11 @@ es später erneut versuchen soll.
 13. shippingDateEarliest und shippingDateLatest beschreiben
 den voraussichtlichen Lieferzeitraum, nicht den Versandzeitraum.
 Diese Daten sind Schätzungen und keine garantierten Liefertermine.
-14. Wenn mehrere Bestellinformationen vorhanden sind, stelle sie übersichtlich dar.
+14. Wenn der Kunde nach mehreren konkreten Bestellinformationen fragt, stelle genau diese Informationen übersichtlich dar.
 15. Gib technische Statuswerte nicht einfach wörtlich wieder, sondern formuliere sie als natürliche Kundenservice-Sätze in korrektem Deutsch. Vermeide dabei redundante Formulierungen wie "Die Zahlung ist bezahlt".
+16. Wenn der Kunde nach bestellten Produkten oder Artikeln fragt, nenne ausschließlich jeden Produktnamen und die jeweilige Menge als eigenen Aufzählungspunkt. Ergänze keine Preise, Produktnummern, Gesamtsumme, Zahlungs-, Status-, Versand- oder Trackinginformationen, außer der Kunde fragt ausdrücklich danach. Verwende keine Markdown-Tabelle.
+17. Wenn das Tool den Fehler "verification_failed" zurückgibt, sage dem Kunden, dass die Kombination aus Bestellnummer und Postleitzahl nicht verifiziert werden konnte, und bitte ihn, seine Angaben zu prüfen. Sage nicht, ob die Bestellnummer existiert.
+18. Beantworte ausschließlich die konkrete Frage des Kunden. Füge keine weiteren Bestellinformationen hinzu, nur weil sie in den Tool-Daten enthalten sind. Nenne Preise, Status, Zahlung, Versand oder Tracking nur, wenn der Kunde genau danach fragt.
 """
 
 tools = [
@@ -35,7 +38,7 @@ tools = [
         "function": {
             "name": "get_order_status",
             "description": (
-                "Liest den aktuellen Status einer Shopware-Bestellung. "
+                "Liest den Status und die enthaltenen Artikel einer Shopware-Bestellung. "
                 "Wenn Bestellnummer und Postleitzahl im Gespräch vorhanden sind, "
                 "muss dieses Tool aufgerufen werden."
             ),
@@ -117,6 +120,7 @@ def get_shopware_order(order_number, shopware_url, shopware_access_id, shopware_
                         "shippingOrderAddress": {},
                     }
                 },
+                "lineItems": {},
             },
             "limit": 1,
         },
@@ -143,9 +147,22 @@ def get_shopware_order(order_number, shopware_url, shopware_access_id, shopware_
     shipping_address_id = None
     shipping_date_earliest = None
     shipping_date_latest = None
+    line_items = []
 
     # First: collect the IDs and basic order data
     for item in data.get("included", []):
+        if item["type"] == "order_line_item":
+            item_attributes = item["attributes"]
+            line_item = {
+                "label": item_attributes.get("label"),
+                "quantity": item_attributes.get("quantity"),
+            }
+            for field in ("productNumber", "unitPrice", "totalPrice"):
+                value = item_attributes.get(field)
+                if value is not None:
+                    line_item[field] = value
+            line_items.append(line_item)
+
         if item["type"] == "order_delivery":
             delivery_state_id = item["attributes"]["stateId"]
             shipping_address_id = item["attributes"]["shippingOrderAddressId"]
@@ -188,6 +205,7 @@ def get_shopware_order(order_number, shopware_url, shopware_access_id, shopware_
         "shippingDateLatest": shipping_date_latest,
         "orderDate": attributes["orderDate"],
         "amountTotal": attributes["amountTotal"],
+        "lineItems": line_items,
     }
 
 
@@ -254,6 +272,9 @@ def ask_agent(
                     "content": json.dumps(result),
                 }
             )
+
+            if result == {"error": "verification_failed"}:
+                return {"error": "verification_failed"}
 
             try:
                 final_response = client.chat.completions.create(

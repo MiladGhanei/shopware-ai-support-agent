@@ -87,6 +87,11 @@ def chat(request: ChatRequest):
         return {"error": "internal_error"}
 
     if isinstance(result, dict):
+        if result.get("error") == "verification_failed":
+            return {
+                "reply": "Die Kombination aus Bestellnummer und Postleitzahl konnte nicht verifiziert werden. Bitte überprüfen Sie Ihre Angaben.",
+                "conversation_id": request.conversation_id,
+            }
         return result
 
     return {
